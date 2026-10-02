@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Radar de Tendencias</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: mesa de taller de serigrafía. Encabezado con marcas de registro CMYK,
+   calendario de temporadas arriba, tablero de tendencias filtrable, buscador en vivo y libreta de ideas. */
+:root {
+  --paper: #f5f6f9;
+  --sheet: #ffffff;
+  --ink: #17192b;
+  --muted: #5b5f78;
+  --line: #dcdfe9;
+  --magenta: #d6246e;
+  --cyan: #0a8fb8;
+  --yellow: #f2c230;
+  --chip: #eceef5;
+  --ok: #1f8a4c;
+  --warn: #b86a00;
+  --font-display: "Bricolage Grotesque", "Arial Black", system-ui, sans-serif;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #12131d; --sheet: #1b1d2b; --ink: #eceef8; --muted: #a2a6c0; --line: #2d3044;
+    --magenta: #ff5c9d; --cyan: #3cc0e8; --yellow: #f5cf55; --chip: #262a3c; --ok: #4cc37f; --warn: #f0a640;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #12131d; --sheet: #1b1d2b; --ink: #eceef8; --muted: #a2a6c0; --line: #2d3044;
+  --magenta: #ff5c9d; --cyan: #3cc0e8; --yellow: #f5cf55; --chip: #262a3c; --ok: #4cc37f; --warn: #f0a640;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.55 var(--font-body);
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; display: grid; gap: 44px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.1; }
+h2 { font-size: 1.55rem; font-weight: 800; }
+h3 { font-size: 1.12rem; font-weight: 800; }
+p { margin: 0; }
+a { color: inherit; }
+.label { font: 500 0.72rem/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; border-radius: 4px; }
+
+/* Encabezado */
+header { display: grid; gap: 14px; position: relative; }
+.reg { display: flex; gap: 6px; align-items: center; }
+.reg span { width: 14px; height: 14px; border-radius: 50%; }
+.reg .c { background: var(--cyan); } .reg .m { background: var(--magenta); } .reg .y { background: var(--yellow); } .reg .k { background: var(--ink); }
+h1 { font-size: clamp(2.3rem, 7vw, 4.4rem); font-weight: 800; letter-spacing: -0.02em; }
+h1 em { font-style: normal; color: var(--magenta); }
+.lede { max-width: 62ch; color: var(--muted); font-size: 1.05rem; }
+
+/* Filtros */
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.seg { display: inline-flex; background: var(--chip); border-radius: 999px; padding: 4px; gap: 2px; flex-wrap: wrap; }
+.seg button { border: 0; background: transparent; color: var(--ink); font: 600 0.92rem var(--font-body); padding: 8px 16px; border-radius: 999px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+input[type="search"], input[type="text"], select, textarea {
+  font: 500 0.95rem var(--font-body); color: var(--ink); background: var(--sheet);
+  border: 1.5px solid var(--line); border-radius: 10px; padding: 9px 12px; min-width: 0;
+}
+input[type="search"]:focus, input[type="text"]:focus, select:focus, textarea:focus { border-color: var(--cyan); outline: none; }
+#q { flex: 1 1 220px; }
+
+.section-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 20px; margin-bottom: 16px; }
+.section-head p { color: var(--muted); max-width: 60ch; }
+
+/* Calendario */
+.cal { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.date {
+  background: var(--sheet); border: 1.5px solid var(--line); border-radius: 12px; padding: 14px;
+  display: grid; gap: 6px; align-content: start;
+}
+.date .days { font: 800 1.9rem/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.date .days small { font: 500 0.8rem var(--font-body); color: var(--muted); margin-left: 4px; }
+.date .when { font: 500 0.75rem var(--font-mono); color: var(--muted); }
+.date .status { justify-self: start; font: 500 0.7rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; padding: 5px 8px; border-radius: 999px; }
+.status.now { background: color-mix(in srgb, var(--magenta) 16%, transparent); color: var(--magenta); }
+.status.soon { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+.status.later { background: var(--chip); color: var(--muted); }
+.date p { font-size: 0.9rem; }
+
+/* Tendencias */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+.card {
+  background: var(--sheet); border: 1.5px solid var(--line); border-radius: 14px; padding: 18px;
+  display: grid; gap: 10px; grid-template-rows: auto auto 1fr auto auto; min-width: 0;
+}
+.card .top { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.tag { font: 500 0.7rem/1 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 8px; border-radius: 6px; }
+.tag.playeras { background: color-mix(in srgb, var(--cyan) 15%, transparent); color: var(--cyan); }
+.tag.invitaciones { background: color-mix(in srgb, var(--magenta) 14%, transparent); color: var(--magenta); }
+.tag.combo { background: color-mix(in srgb, var(--yellow) 30%, transparent); color: var(--ink); }
+.heat { font: 500 0.72rem var(--font-mono); color: var(--muted); white-space: nowrap; }
+.heat b { color: var(--magenta); letter-spacing: 1px; }
+.card .desc { color: var(--muted); font-size: 0.93rem; }
+.idea { background: var(--chip); border-radius: 10px; padding: 10px 12px; font-size: 0.9rem; }
+.idea strong { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; display: block; margin-bottom: 2px; color: var(--muted); font-weight: 500; }
+.links { display: flex; flex-wrap: wrap; gap: 6px; }
+.links a, .btn {
+  font: 600 0.82rem var(--font-body); text-decoration: none; border: 1.5px solid var(--line); background: transparent;
+  color: var(--ink); padding: 6px 10px; border-radius: 8px; cursor: pointer;
+}
+.links a:hover, .btn:hover { border-color: var(--ink); }
+.btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.btn.save.saved { background: var(--ok); border-color: var(--ok); color: #fff; }
+.empty { color: var(--muted); padding: 24px 0; }
+
+/* Buscador en vivo */
+.live { background: var(--sheet); border: 1.5px solid var(--line); border-radius: 16px; padding: 20px; display: grid; gap: 16px; }
+.live-row { display: flex; flex-wrap: wrap; gap: 10px; }
+#kw { flex: 1 1 240px; font-size: 1.05rem; }
+.sources { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.source { display: grid; gap: 2px; text-decoration: none; padding: 12px 14px; border-radius: 10px; background: var(--chip); border: 1.5px solid transparent; }
+.source:hover { border-color: var(--cyan); }
+.source b { font-family: var(--font-display); font-size: 1rem; }
+.source span { font-size: 0.85rem; color: var(--muted); }
+.quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.quick button { font: 500 0.8rem var(--font-mono); background: transparent; border: 1.5px dashed var(--line); color: var(--muted); padding: 5px 9px; border-radius: 999px; cursor: pointer; }
+.quick button:hover { color: var(--ink); border-color: var(--ink); }
+
+/* Libreta */
+.notebook { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 760px) { .notebook { grid-template-columns: minmax(0, 1fr); } }
+form.add { display: grid; gap: 10px; background: var(--sheet); border: 1.5px solid var(--line); border-radius: 16px; padding: 18px; }
+form.add label { display: grid; gap: 4px; font-size: 0.85rem; font-weight: 600; }
+textarea { resize: vertical; min-height: 70px; }
+.ideas { display: grid; gap: 10px; }
+.note { background: var(--sheet); border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
+.note h4 { margin: 0; font: 600 1rem var(--font-body); overflow-wrap: anywhere; }
+.note p { color: var(--muted); font-size: 0.9rem; grid-column: 1 / -1; overflow-wrap: anywhere; }
+.note .meta { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.note .x { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 0.85rem; text-decoration: underline; }
+.note.example { border-style: dashed; }
+
+footer { color: var(--muted); font-size: 0.85rem; border-top: 1.5px solid var(--line); padding-top: 18px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .card, .date { transition: transform .15s ease, border-color .15s ease; }
+  .card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="reg" aria-hidden="true"><span class="c"></span><span class="m"></span><span class="y"></span><span class="k"></span></div>
+  <h1>Radar de <em>Tendencias</em></h1>
+  <p class="lede">Todo en un solo lugar para sacar ideas: lo que se está moviendo en diseño de playeras e invitaciones, las fechas que vienen y accesos directos para buscar tendencias en vivo.</p>
+</header>
+
+<section id="calendario" aria-labelledby="cal-h">
+  <div class="section-head">
+    <h2 id="cal-h">Próximas temporadas</h2>
+    <p>Cuenta regresiva y cuándo empezar a publicar. “Ya” significa que ya deberías estar ofreciendo diseños para esa fecha.</p>
+  </div>
+  <div class="cal" id="cal"></div>
+</section>
+
+<section id="tendencias" aria-labelledby="tr-h">
+  <div class="section-head">
+    <h2 id="tr-h">Tendencias</h2>
+    <p>Cada tarjeta trae una idea lista para vender y botones para ver ejemplos reales.</p>
+  </div>
+  <div class="toolbar" style="margin-bottom:16px">
+    <div class="seg" role="group" aria-label="Filtrar por negocio">
+      <button type="button" data-f="todo" aria-pressed="true">Todo</button>
+      <button type="button" data-f="playeras" aria-pressed="false">Playeras</button>
+      <button type="button" data-f="invitaciones" aria-pressed="false">Invitaciones</button>
+      <button type="button" data-f="combo" aria-pressed="false">Combos</button>
+    </div>
+    <input type="search" id="q" placeholder="Filtrar: vintage, XV años, mascotas…" aria-label="Filtrar tendencias">
+  </div>
+  <div class="grid" id="grid"></div>
+</section>
+
+<section id="buscar" aria-labelledby="live-h">
+  <div class="section-head">
+    <h2 id="live-h">Buscar en vivo</h2>
+    <p>Escribe una palabra y abre cada fuente ya con tu búsqueda. Así ves qué se está vendiendo hoy.</p>
+  </div>
+  <div class="live">
+    <div class="live-row">
+      <input type="text" id="kw" value="playera vintage" aria-label="Palabra a buscar">
+    </div>
+    <div class="quick" id="quick" aria-label="Búsquedas rápidas"></div>
+    <div class="sources" id="sources"></div>
+  </div>
+</section>
+
+<section id="ideas" aria-labelledby="id-h">
+  <div class="section-head">
+    <h2 id="id-h">Mi libreta de ideas</h2>
+    <p>Guarda aquí lo que te inspire. Se queda guardado en este navegador.</p>
+  </div>
+  <div class="notebook">
+    <form class="add" id="addForm">
+      <label for="nTitle">Idea
+        <input type="text" id="nTitle" placeholder="Ej. Playera “Hecho en Oaxaca” bordado" required>
+      </label>
+      <label for="nType">Para
+        <select id="nType">
+          <option value="playeras">Playeras</option>
+          <option value="invitaciones">Invitaciones</option>
+          <option value="combo">Combo (las dos)</option>
+        </select>
+      </label>
+      <label for="nNote">Notas
+        <textarea id="nNote" placeholder="Colores, cliente, link de referencia, precio…"></textarea>
+      </label>
+      <button class="btn primary" type="submit">Guardar idea</button>
+    </form>
+    <div class="ideas" id="ideaList"></div>
+  </div>
+</section>
+
+<footer>
+  Las tendencias se resumen de reportes de diseño 2026 (Printful, Sellfy, Gelato, Vistaprint, ¡HOLA! Novias) y de temporadas de venta en México. Revísalas cada mes con la sección “Buscar en vivo”.
+</footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Datos ----------
+  const TRENDS = [
+    // Playeras
+    { t: "playeras", h: 5, title: "Nostalgia 90s y Y2K", desc: "Gráficos tipo caricatura de los 90, colores saturados, fuentes de videojuego y referencias a la infancia de los millennials.", idea: "Línea “Hecho en los 90” con tus frases locales y una paleta de colores de dulces mexicanos.", kw: "playera retro 90s" },
+    { t: "playeras", h: 5, title: "Vintage deslavado", desc: "Estampado con textura gastada, tintas suaves y look de playera de concierto viejita. Se vende como prenda “de siempre”.", idea: "Diseños de tu ciudad o fiestas del pueblo con efecto desgastado, en playeras color arena o verde olivo.", kw: "vintage washed graphic tee" },
+    { t: "playeras", h: 4, title: "Tipografía 3D y cromo", desc: "Letras con volumen, brillo metálico y efecto inflado. Muy fuerte en ropa urbana.", idea: "Nombres o apodos en letra cromada para grupos de amigos o equipos.", kw: "3d chrome typography shirt" },
+    { t: "playeras", h: 4, title: "Puff print (relieve)", desc: "Tinta que se infla al planchar y deja el diseño en relieve. Se siente premium y permite cobrar más.", idea: "Frase corta de una o dos palabras al pecho en puff blanco sobre playera oversize.", kw: "puff print t-shirt" },
+    { t: "playeras", h: 4, title: "Anti-diseño y dibujo a mano", desc: "Trazos “mal hechos” a propósito, letras chuecas y collage. Se ve auténtico y personal.", idea: "Dibujos infantiles de los hijos convertidos en playera para mamá o papá.", kw: "hand drawn doodle shirt" },
+    { t: "playeras", h: 4, title: "Minimal de línea fina", desc: "Un solo trazo, iconos pequeños al pecho y mucho espacio vacío. Va con todo y se vende todo el año.", idea: "Mini bordado o estampado al pecho con la silueta de una mascota del cliente.", kw: "minimalist line art shirt" },
+    { t: "playeras", h: 3, title: "Pasteles y frases cortas", desc: "Colores suaves con mensajes positivos o de autocuidado. Público femenino y joven.", idea: "Colección “Mood del día” con frases en español mexicano.", kw: "pastel aesthetic shirt" },
+    { t: "playeras", h: 3, title: "Cósmico y astrología", desc: "Signos zodiacales, lunas, estrellas y degradados. Funciona muy bien como regalo de cumpleaños.", idea: "Playera por signo con la fecha de cumpleaños personalizada.", kw: "zodiac shirt design" },
+    { t: "playeras", h: 3, title: "Naturaleza y eco", desc: "Botánica, montañas, animales y mensajes de cuidar el planeta. Combina con algodón orgánico.", idea: "Flora de tu región dibujada en línea con nombre científico abajo.", kw: "botanical tee design" },
+    { t: "playeras", h: 5, title: "Orgullo mexicano", desc: "Lotería, frases populares, comida, luchadores y tipografía de rótulo. Se vende todo el año y explota en septiembre.", idea: "Cartas de lotería personalizadas: “El Ingeniero”, “La Maestra”, “El Compadre”.", kw: "playera loteria mexicana" },
+    { t: "playeras", h: 4, title: "Mascotas personalizadas", desc: "Retrato de la mascota del cliente en estilo caricatura o línea. Muy compartido en redes.", idea: "Paquete dueño + mascota: playera y paliacate con el mismo dibujo.", kw: "custom pet portrait shirt" },
+    // Invitaciones
+    { t: "invitaciones", h: 5, title: "Lujo vintage", desc: "Sellos de lacre, marcos clásicos, tipografía serif elegante y papel color hueso. Muy fuerte en bodas 2026.", idea: "Invitación con sobre y sello de lacre con las iniciales de los novios.", kw: "invitacion boda vintage lacre" },
+    { t: "invitaciones", h: 5, title: "Romance de cuentos", desc: "Ilustraciones tipo cuento de hadas, castillos, flores y personajes. Perfecto para XV años.", idea: "XV años con portada ilustrada de la quinceañera como princesa de cuento.", kw: "invitacion xv años cuento de hadas" },
+    { t: "invitaciones", h: 4, title: "Detalles artesanales", desc: "Papel con textura, acuarela, flores prensadas, listón y orillas rasgadas. Se siente hecho a mano.", idea: "Invitación en acuarela con flor natural prensada para bodas en jardín.", kw: "handmade wedding invitation watercolor" },
+    { t: "invitaciones", h: 4, title: "Gráfica editorial", desc: "Diseño tipo portada de revista: foto grande, letras enormes y mucho contraste.", idea: "Save the date como portada de revista con la foto de la pareja.", kw: "editorial wedding invitation magazine" },
+    { t: "invitaciones", h: 4, title: "Curvas y color vivo", desc: "Formas onduladas, trazos libres y colores alegres en lugar del blanco y dorado de siempre.", idea: "Invitación de cumpleaños con formas onduladas en dos colores fuertes.", kw: "colorful wavy invitation design" },
+    { t: "invitaciones", h: 5, title: "Invitación digital interactiva", desc: "Página web o video con cuenta regresiva, mapa, confirmación por WhatsApp y código QR.", idea: "Ofrece la impresa más una versión digital con QR como paquete premium.", kw: "invitacion digital interactiva" },
+    { t: "invitaciones", h: 4, title: "Papelería completa del evento", desc: "Ya no es solo la invitación: save the date, menú, mesa de bienvenida, seating y etiquetas.", idea: "Vende por paquetes: básico (invitación), medio (+ menú y etiquetas), completo (todo el evento).", kw: "papeleria boda completa" },
+    { t: "invitaciones", h: 3, title: "Monograma de iniciales", desc: "Las iniciales de los festejados como logo del evento y se repiten en todo.", idea: "Diseña el monograma una vez y úsalo en invitación, menú, servilletas y playeras.", kw: "wedding monogram design" },
+    { t: "invitaciones", h: 3, title: "Pastel para bebé", desc: "Baby shower, bautizo y primer año con tonos suaves, animalitos y globos.", idea: "Invitación de bautizo con el nombre del bebé en letra cursiva y acuarela azul o rosa.", kw: "invitacion baby shower pastel" },
+    // Combos
+    { t: "combo", h: 5, title: "Evento a juego", desc: "Invitación y playeras con el mismo diseño. Cumpleaños, viajes, despedidas de soltera y reuniones familiares.", idea: "Paquete “Fiesta completa”: invitación digital + 10 playeras con el logo del evento.", kw: "matching party shirts" },
+    { t: "combo", h: 5, title: "XV años completo", desc: "Invitaciones, playeras para chambelanes y familia, y recuerdos con el mismo monograma.", idea: "Playeras “Team Quince” para el ensayo del vals con el nombre de la quinceañera.", kw: "playeras xv años chambelanes" },
+    { t: "combo", h: 4, title: "Despedida de soltera", desc: "Playeras con frase para la novia y sus amigas más la invitación con el mismo estilo.", idea: "“Última fiesta de soltera” en letra 3D rosa: playera para todas + invitación digital.", kw: "bachelorette party shirts" },
+    { t: "combo", h: 4, title: "Graduaciones", desc: "Playeras de generación y invitaciones de fiesta de graduación. Temporada fuerte de mayo a julio.", idea: "Playera de generación con los nombres de todo el grupo atrás.", kw: "playera generacion graduacion" },
+  ];
+
+  const EVENTS = [
+    { m: 10, d: 31, name: "Halloween", lead: 4, idea: "Playeras de disfraz para la familia e invitaciones de fiesta de terror." },
+    { m: 11, d: 2, name: "Día de Muertos", lead: 5, idea: "Catrinas, cempasúchil y calaveritas con el nombre del cliente." },
+    { m: 11, d: 13, approx: true, name: "Buen Fin", lead: 3, idea: "Promos por paquete: 3 playeras o invitación + playeras." },
+    { m: 12, d: 12, name: "Virgen de Guadalupe", lead: 4, idea: "Playeras grupales para peregrinaciones de colonias y empresas." },
+    { m: 12, d: 16, name: "Posadas", lead: 5, idea: "Invitaciones de posada y playeras tipo suéter navideño feo." },
+    { m: 12, d: 24, name: "Navidad", lead: 6, idea: "Playeras y pijamas familiares a juego con el apellido." },
+    { m: 12, d: 31, name: "Año Nuevo", lead: 3, idea: "Invitaciones de fiesta y playeras con el año nuevo." },
+    { m: 1, d: 6, name: "Día de Reyes", lead: 3, idea: "Invitación para la rosca y playeras para niños." },
+    { m: 2, d: 14, name: "San Valentín", lead: 4, idea: "Playeras de pareja y frases de amistad." },
+    { m: 4, d: 30, name: "Día del Niño", lead: 4, idea: "Playeras con personajes y nombre, invitaciones de fiesta infantil." },
+    { m: 5, d: 10, name: "Día de las Madres", lead: 5, idea: "Playeras con los nombres de los hijos o dibujos hechos por ellos." },
+    { fathers: true, name: "Día del Padre", lead: 4, idea: "Playeras “El Jefe”, carta de lotería personalizada." },
+    { m: 6, d: 26, approx: true, name: "Graduaciones", lead: 8, idea: "Playeras de generación e invitaciones de fiesta de graduación." },
+  ];
+
+  const SOURCES = [
+    { name: "Google Trends México", what: "Qué tanto se busca y si va subiendo", url: q => "https://trends.google.com/trends/explore?geo=MX&q=" + enc(q) },
+    { name: "Pinterest", what: "Ideas visuales y estilos", url: q => "https://www.pinterest.com/search/pins/?q=" + enc(q) },
+    { name: "Pinterest Trends", what: "Lo que sube en Pinterest por temporada", url: () => "https://trends.pinterest.com/" },
+    { name: "TikTok Creative Center", what: "Hashtags y temas en tendencia", url: () => "https://ads.tiktok.com/business/creativecenter/inspiration/popular/hashtag/pc/es" },
+    { name: "TikTok", what: "Videos de lo que se está vendiendo", url: q => "https://www.tiktok.com/search?q=" + enc(q) },
+    { name: "Instagram", what: "Publicaciones con el hashtag", url: q => "https://www.instagram.com/explore/tags/" + enc(q.replace(/\s+/g, "").toLowerCase()) + "/" },
+    { name: "Etsy", what: "Qué diseños se venden y a qué precio", url: q => "https://www.etsy.com/search?q=" + enc(q) + "&order=most_relevant" },
+    { name: "Mercado Libre", what: "Competencia y precios en México", url: q => "https://listado.mercadolibre.com.mx/" + enc(q.trim().replace(/\s+/g, "-")) },
+    { name: "Amazon México", what: "Lo más vendido en ropa", url: () => "https://www.amazon.com.mx/gp/bestsellers/fashion" },
+    { name: "Redbubble", what: "Diseños de playera populares", url: q => "https://www.redbubble.com/shop?query=" + enc(q) },
+    { name: "Canva", what: "Plantillas de invitación para inspirarte", url: q => "https://www.canva.com/templates/search/" + enc(q) + "/" },
+    { name: "Behance", what: "Diseño profesional de referencia", url: q => "https://www.behance.net/search/projects?search=" + enc(q) },
+  ];
+
+  const QUICK = ["playera vintage", "playera oversize", "puff print", "playera loteria", "invitacion xv años", "invitacion boda 2026", "invitacion digital", "baby shower", "playeras familiares navidad", "dia de muertos playera"];
+
+  // ---------- Utilidades ----------
+  function enc(s) { return encodeURIComponent(s); }
+  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+  const store = {
+    get(k, def) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch (e) { return def; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } },
+  };
+  const TYPE_LABEL = { playeras: "Playeras", invitaciones: "Invitaciones", combo: "Combo" };
+
+  // ---------- Calendario ----------
+  function thirdSundayOfJune(y) {
+    const first = new Date(y, 5, 1);
+    const offset = (7 - first.getDay()) % 7;
+    return new Date(y, 5, 1 + offset + 14);
+  }
+  function nextDate(ev, today) {
+    const y = today.getFullYear();
+    const make = yr => ev.fathers ? thirdSundayOfJune(yr) : new Date(yr, ev.m - 1, ev.d);
+    let dt = make(y);
+    if (dt < today) dt = make(y + 1);
+    return dt;
+  }
+  function renderCalendar() {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const fmt = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" });
+    const list = EVENTS.map(ev => {
+      const dt = nextDate(ev, today);
+      return { ...ev, dt, days: Math.round((dt - today) / 86400000) };
+    }).sort((a, b) => a.days - b.days).slice(0, 8);
+    document.getElementById("cal").innerHTML = list.map(ev => {
+      const leadDays = ev.lead * 7;
+      let cls = "later", label = "Prepara en " + (ev.days - leadDays) + " días";
+      if (ev.days <= leadDays) { cls = "now"; label = "Ya: a vender"; }
+      else if (ev.days <= leadDays + 21) { cls = "soon"; label = "Diseña ahora"; }
+      return '<article class="date">' +
+        '<span class="label">' + esc(ev.name) + '</span>' +
+        '<div class="days">' + (ev.days === 0 ? "Hoy" : ev.days + '<small>días</small>') + '</div>' +
+        '<span class="when">' + (ev.approx ? "aprox. " : "") + fmt.format(ev.dt) + ' · vender ' + ev.lead + ' sem. antes</span>' +
+        '<span class="status ' + cls + '">' + label + '</span>' +
+        '<p>' + esc(ev.idea) + '</p></article>';
+    }).join("");
+  }
+
+  // ---------- Tendencias ----------
+  let filter = store.get("rt-filter", "todo");
+  let ideas = store.get("rt-ideas", null);
+
+  function renderTrends() {
+    const q = document.getElementById("q").value.trim().toLowerCase();
+    const savedTitles = new Set((ideas || []).map(i => i.title));
+    const items = TRENDS.filter(x => (filter === "todo" || x.t === filter) &&
+      (!q || (x.title + " " + x.desc + " " + x.idea + " " + x.kw).toLowerCase().includes(q)))
+      .sort((a, b) => b.h - a.h);
+    const grid = document.getElementById("grid");
+    if (!items.length) { grid.innerHTML = '<p class="empty">No hay tendencias con ese filtro. Prueba otra palabra o busca en vivo abajo.</p>'; return; }
+    grid.innerHTML = items.map(x => {
+      const i = TRENDS.indexOf(x);
+      const saved = savedTitles.has(x.title);
+      return '<article class="card">' +
+        '<div class="top"><span class="tag ' + x.t + '">' + TYPE_LABEL[x.t] + '</span>' +
+        '<span class="heat" title="Qué tan fuerte está">Fuerza <b>' + "●".repeat(x.h) + '</b>' + "○".repeat(5 - x.h) + '</span></div>' +
+        '<h3>' + esc(x.title) + '</h3>' +
+        '<p class="desc">' + esc(x.desc) + '</p>' +
+        '<div class="idea"><strong>Idea para vender</strong>' + esc(x.idea) + '</div>' +
+        '<div class="links">' +
+          '<a href="https://www.pinterest.com/search/pins/?q=' + enc(x.kw) + '" target="_blank" rel="noopener">Pinterest</a>' +
+          '<a href="https://www.etsy.com/search?q=' + enc(x.kw) + '" target="_blank" rel="noopener">Etsy</a>' +
+          '<a href="https://www.tiktok.com/search?q=' + enc(x.kw) + '" target="_blank" rel="noopener">TikTok</a>' +
+          '<button type="button" class="btn save' + (saved ? " saved" : "") + '" data-save="' + i + '">' + (saved ? "Guardada" : "Guardar") + '</button>' +
+        '</div></article>';
+    }).join("");
+  }
+
+  document.querySelectorAll(".seg button").forEach(b => {
+    b.setAttribute("aria-pressed", String(b.dataset.f === filter));
+    b.addEventListener("click", () => {
+      filter = b.dataset.f; store.set("rt-filter", filter);
+      document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+      renderTrends();
+    });
+  });
+  document.getElementById("q").addEventListener("input", renderTrends);
+  document.getElementById("grid").addEventListener("click", e => {
+    const b = e.target.closest("[data-save]"); if (!b) return;
+    const x = TRENDS[+b.dataset.save];
+    if (!ideas.some(i => i.title === x.title)) {
+      ideas.unshift({ id: Date.now(), title: x.title, type: x.t, note: x.idea, date: new Date().toISOString() });
+      saveIdeas();
+    }
+  });
+
+  // ---------- Buscar en vivo ----------
+  function renderSources() {
+    const q = document.getElementById("kw").value.trim() || "playera";
+    document.getElementById("sources").innerHTML = SOURCES.map(s =>
+      '<a class="source" href="' + esc(s.url(q)) + '" target="_blank" rel="noopener"><b>' + esc(s.name) + ' ↗</b><span>' + esc(s.what) + '</span></a>'
+    ).join("");
+  }
+  document.getElementById("quick").innerHTML = QUICK.map(k => '<button type="button" data-k="' + esc(k) + '">' + esc(k) + '</button>').join("");
+  document.getElementById("quick").addEventListener("click", e => {
+    const b = e.target.closest("[data-k]"); if (!b) return;
+    document.getElementById("kw").value = b.dataset.k; renderSources();
+  });
+  document.getElementById("kw").addEventListener("input", renderSources);
+
+  // ---------- Libreta ----------
+  const EXAMPLES = [
+    { id: 1, example: true, title: "Playeras familiares Día de Muertos", type: "playeras", note: "Catrina con el apellido de la familia. Probar en negro con tinta naranja cempasúchil." },
+    { id: 2, example: true, title: "XV años estilo cuento + playeras chambelanes", type: "combo", note: "Mismo monograma en invitación y playeras del ensayo." },
+  ];
+  if (!Array.isArray(ideas)) ideas = [];
+  function saveIdeas() { store.set("rt-ideas", ideas); renderIdeas(); renderTrends(); }
+  function renderIdeas() {
+    const list = ideas.length ? ideas : EXAMPLES;
+    const fmt = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" });
+    document.getElementById("ideaList").innerHTML =
+      (ideas.length ? "" : '<p class="label">Ejemplos: agrega tu primera idea y desaparecen</p>') +
+      list.map(n => '<article class="note' + (n.example ? " example" : "") + '">' +
+        '<h4>' + esc(n.title) + '</h4>' +
+        (n.example ? "" : '<button type="button" class="x" data-del="' + n.id + '">Borrar</button>') +
+        (n.note ? '<p>' + esc(n.note) + '</p>' : "") +
+        '<div class="meta"><span class="tag ' + n.type + '">' + TYPE_LABEL[n.type] + '</span>' +
+        (n.date ? '<span class="label">' + fmt.format(new Date(n.date)) + '</span>' : "") + '</div></article>'
+      ).join("");
+  }
+  document.getElementById("ideaList").addEventListener("click", e => {
+    const b = e.target.closest("[data-del]"); if (!b) return;
+    ideas = ideas.filter(i => String(i.id) !== b.dataset.del); saveIdeas();
+  });
+  document.getElementById("addForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const title = document.getElementById("nTitle").value.trim(); if (!title) return;
+    ideas.unshift({ id: Date.now(), title, type: document.getElementById("nType").value, note: document.getElementById("nNote").value.trim(), date: new Date().toISOString() });
+    e.target.reset(); saveIdeas();
+  });
+
+  renderCalendar(); renderTrends(); renderSources(); renderIdeas();
+})();
+</script>
+</body>
+</html>
